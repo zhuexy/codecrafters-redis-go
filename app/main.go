@@ -29,7 +29,7 @@ func main() {
 	}
 	for {
 		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
+		_, err := conn.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -37,12 +37,10 @@ func main() {
 			fmt.Println("Failed to read")
 			return
 		}
-		if string(buf[:n]) == "PING\r\n" {
-			_, err = conn.Write([]byte("+PONG\r\n"))
-			if err != nil {
-				fmt.Println("Failed to write")
-				return
-			}
+		_, err = conn.Write([]byte("+PONG\r\n"))
+		if err != nil {
+			fmt.Println("Failed to write")
+			return
 		}
 	}
 }
