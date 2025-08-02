@@ -71,8 +71,9 @@ func (this *Server) HandleConn(conn net.Conn) {
 			this.Echo(conn, args[1])
 		case "SET":
 			this.Set(conn, args)
+		case "GET":
+			this.Get(conn, args)
 		}
-
 	}
 }
 
