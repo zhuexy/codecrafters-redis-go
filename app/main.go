@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
 )
@@ -26,9 +27,22 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
-	_, err = conn.Write([]byte("+PONG\r\n"))
-	if err != nil {
-		fmt.Println("Failed to write")
-		return
+	for {
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println("Failed to read")
+			return
+		}
+		if string(buf[:n]) == "PING" {
+			_, err = conn.Write([]byte("+PONG\r\n"))
+			if err != nil {
+				fmt.Println("Failed to write")
+				return
+			}
+		}
 	}
 }
