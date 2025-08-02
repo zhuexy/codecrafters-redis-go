@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -33,30 +35,63 @@ func main() {
 }
 
 func handleConn(conn net.Conn) {
-	buf := make([]byte, 1024)
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+	// redis protocol "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n"
 	for {
-		n, err := conn.Read(buf)
+		line, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Println("Failed to read")
 			return
 		}
-		message := strings.TrimSpace(string(buf[:n]))
-		fmt.Println("Received: ", message)
-		if message == "PING" {
-			_, err = conn.Write([]byte("+PONG\r\n"))
+		line = strings.TrimRight(line, "\r\n")
+		if !strings.HasPrefix(line, "*") {
+			fmt.Println("Failed to parse command")
+			return
+		}
+		count, err := strconv.Atoi(line[1:])
+		if err != nil {
+			fmt.Println("Failed to parse count")
+			return
+		}
+		args := make([]string, count)
+		for i := 0; i < count; i++ {
+			line, err := reader.ReadString('\n')
 			if err != nil {
-				fmt.Println("Failed to write")
+				fmt.Println("Failed to read")
 				return
 			}
-		} else {
-			words := strings.Split(message, " ")
-			if strings.ToLower(words[0]) == "echo" {
-				_, err = conn.Write([]byte("+" + words[1] + "\r\n"))
-				if err != nil {
-					fmt.Println("Failed to write")
-					return
-				}
+			line = strings.TrimRight(line, "\r\n")
+			if !strings.HasPrefix(line, "$") {
+				fmt.Println("Failed to parse argument")
+				return
 			}
+			length, err := strconv.Atoi(line[1:])
+			if err != nil {
+				fmt.Println("Failed to parse length")
+				return
+			}
+			line, err = reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Failed to read")
+				return
+			}
+			args[i] = strings.ToUpper(line[:length])
 		}
+		switch args[0] {
+		case "PING":
+			ping(conn)
+		case "ECHO":
+			echo(conn, args[1])
+		}
+
 	}
+}
+
+func ping(conn net.Conn) {
+	conn.Write([]byte("+PONG\r\n"))
+}
+
+func echo(conn net.Conn, message string) {
+	conn.Write([]byte("+" + message + "\r\n"))
 }
