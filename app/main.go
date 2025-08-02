@@ -40,7 +40,7 @@ func handleConn(conn net.Conn) {
 			fmt.Println("Failed to read")
 			return
 		}
-		message := string(buf[:n])
+		message := strings.TrimSpace(string(buf[:n]))
 		fmt.Println("Received: ", message)
 		if message == "PING" {
 			_, err = conn.Write([]byte("+PONG\r\n"))
