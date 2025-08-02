@@ -76,7 +76,12 @@ func handleConn(conn net.Conn) {
 				fmt.Println("Failed to read")
 				return
 			}
-			args[i] = strings.ToUpper(line[:length])
+			// if this arg is command, need to ToUpper
+			if i == 0 {
+				args[i] = strings.ToUpper(line[:length])
+			} else {
+				args[i] = line[:length]
+			}
 		}
 		switch args[0] {
 		case "PING":
