@@ -8,10 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Server struct {
-	stringData map[string]string
+	stringData map[string]StringData
 	//hashData map[string]map[string]string
 	IP   string
 	Port int
@@ -20,7 +21,7 @@ type Server struct {
 
 func NewServer(ip string, port int) *Server {
 	return &Server{
-		stringData: make(map[string]string),
+		stringData: make(map[string]StringData),
 		IP:         ip,
 		Port:       port,
 	}
@@ -64,7 +65,8 @@ func (this *Server) HandleConn(conn net.Conn) {
 		}
 		args := make([]string, count)
 		getArgs(reader, args)
-		switch args[0] {
+		command := strings.ToUpper(args[0])
+		switch command {
 		case "PING":
 			this.Ping(conn)
 		case "ECHO":
@@ -85,14 +87,20 @@ func (this *Server) write(conn net.Conn, msg string) {
 }
 
 func (this *Server) Get(conn net.Conn, args []string) {
+	key := args[1]
 	this.lock.Lock()
-	value, ok := this.stringData[args[1]]
+	data, ok := this.stringData[key]
 	this.lock.Unlock()
-	if ok {
-		this.write(conn, "$"+strconv.Itoa(len(value))+"\r\n"+value+"\r\n")
+	if !ok {
+		this.write(conn, "$-1\r\n")
+		return
+	}
+	if data.Expire == -1 || time.Now().UnixMilli() < data.Expire {
+		this.write(conn, "$"+strconv.Itoa(len(data.Value))+"\r\n"+data.Value+"\r\n")
 	} else {
 		this.write(conn, "$-1\r\n")
 	}
+
 }
 
 func (this *Server) Set(conn net.Conn, args []string) {
@@ -101,7 +109,24 @@ func (this *Server) Set(conn net.Conn, args []string) {
 		return
 	}
 	this.lock.Lock()
-	this.stringData[args[1]] = args[2]
+	data := StringData{
+		Value:  args[2],
+		Expire: -1,
+	}
+	if len(args) > 3 && strings.ToLower(args[3]) == "px" {
+		if len(args) < 5 {
+			fmt.Println("Failed to set")
+			return
+		}
+		expire, err := strconv.Atoi(args[4])
+		if err != nil {
+			fmt.Println("Failed to parse expire")
+			this.lock.Unlock()
+			return
+		}
+		data.Expire = time.Now().UnixMilli() + int64(expire)
+	}
+	this.stringData[args[1]] = data
 	this.lock.Unlock()
 	_, err := conn.Write([]byte("+OK\r\n"))
 	if err != nil {
@@ -145,11 +170,6 @@ func getArgs(reader *bufio.Reader, args []string) {
 			fmt.Println("Failed to read")
 			return
 		}
-		// if this arg is command, need to ToUpper
-		if i == 0 {
-			args[i] = strings.ToUpper(line[:length])
-		} else {
-			args[i] = line[:length]
-		}
+		args[i] = line[:length]
 	}
 }
