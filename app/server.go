@@ -45,7 +45,12 @@ func (this *Server) Start() {
 }
 
 func (this *Server) HandleConn(conn net.Conn) {
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			fmt.Println("Failed to close conn")
+		}
+	}(conn)
 	reader := bufio.NewReader(conn)
 	// redis protocol "*2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n"
 	for {
@@ -78,6 +83,8 @@ func (this *Server) HandleConn(conn net.Conn) {
 			this.Get(conn, args)
 		case "RPUSH":
 			this.RPush(conn, args)
+		case "LRANGE":
+			this.LRange(conn, args)
 		}
 	}
 }
@@ -146,7 +153,10 @@ func (this *Server) Ping(conn net.Conn) {
 }
 
 func (this *Server) Echo(conn net.Conn, msg string) {
-	conn.Write([]byte("+" + msg + "\r\n"))
+	_, err := conn.Write([]byte("+" + msg + "\r\n"))
+	if err != nil {
+		fmt.Println("Failed to write")
+	}
 }
 
 func (this *Server) RPush(conn net.Conn, args []string) {
@@ -169,6 +179,40 @@ func (this *Server) RPush(conn net.Conn, args []string) {
 	this.listData[key] = data
 	this.lock.Unlock()
 	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
+}
+
+func (this *Server) LRange(conn net.Conn, args []string) {
+	if len(args) < 4 {
+		fmt.Println("Failed to lrange")
+		return
+	}
+	key := args[1]
+	start, err := strconv.Atoi(args[2])
+	if err != nil {
+		fmt.Println("Failed to parse start")
+		return
+	}
+	stop, err := strconv.Atoi(args[3])
+	if err != nil {
+		fmt.Println("Failed to parse stop")
+		return
+	}
+	this.lock.Lock()
+	data, ok := this.listData[key]
+	this.lock.Unlock()
+	if !ok {
+		this.write(conn, "*0\r\n")
+		return
+	}
+	result := data.Value[start : stop+1]
+	this.writeList(conn, result)
+}
+
+func (this *Server) writeList(conn net.Conn, result []string) {
+	this.write(conn, "*"+strconv.Itoa(len(result))+"\r\n")
+	for _, value := range result {
+		this.write(conn, "$"+strconv.Itoa(len(value))+"\r\n"+value+"\r\n")
+	}
 }
 
 func getArgs(reader *bufio.Reader, args []string) {
