@@ -12,18 +12,19 @@ import (
 )
 
 type Server struct {
-	stringData map[string]StringData
-	//hashData map[string]map[string]string
-	IP   string
-	Port int
-	lock sync.Mutex
+	strData  map[string]StrData
+	listData map[string]ListData
+	IP       string
+	Port     int
+	lock     sync.Mutex
 }
 
 func NewServer(ip string, port int) *Server {
 	return &Server{
-		stringData: make(map[string]StringData),
-		IP:         ip,
-		Port:       port,
+		strData:  make(map[string]StrData),
+		listData: make(map[string]ListData),
+		IP:       ip,
+		Port:     port,
 	}
 }
 
@@ -75,6 +76,8 @@ func (this *Server) HandleConn(conn net.Conn) {
 			this.Set(conn, args)
 		case "GET":
 			this.Get(conn, args)
+		case "RPUSH":
+			this.RPush(conn, args)
 		}
 	}
 }
@@ -89,7 +92,7 @@ func (this *Server) write(conn net.Conn, msg string) {
 func (this *Server) Get(conn net.Conn, args []string) {
 	key := args[1]
 	this.lock.Lock()
-	data, ok := this.stringData[key]
+	data, ok := this.strData[key]
 	this.lock.Unlock()
 	if !ok {
 		this.write(conn, "$-1\r\n")
@@ -100,7 +103,6 @@ func (this *Server) Get(conn net.Conn, args []string) {
 	} else {
 		this.write(conn, "$-1\r\n")
 	}
-
 }
 
 func (this *Server) Set(conn net.Conn, args []string) {
@@ -109,7 +111,7 @@ func (this *Server) Set(conn net.Conn, args []string) {
 		return
 	}
 	this.lock.Lock()
-	data := StringData{
+	data := StrData{
 		Value:  args[2],
 		Expire: -1,
 	}
@@ -126,7 +128,7 @@ func (this *Server) Set(conn net.Conn, args []string) {
 		}
 		data.Expire = time.Now().UnixMilli() + int64(expire)
 	}
-	this.stringData[args[1]] = data
+	this.strData[args[1]] = data
 	this.lock.Unlock()
 	_, err := conn.Write([]byte("+OK\r\n"))
 	if err != nil {
@@ -145,6 +147,25 @@ func (this *Server) Ping(conn net.Conn) {
 
 func (this *Server) Echo(conn net.Conn, msg string) {
 	conn.Write([]byte("+" + msg + "\r\n"))
+}
+
+func (this *Server) RPush(conn net.Conn, args []string) {
+	if len(args) < 3 {
+		fmt.Println("Failed to rpush")
+		return
+	}
+	key := args[1]
+	this.lock.Lock()
+	data, ok := this.listData[key]
+	if !ok {
+		data = ListData{
+			Value:  make([]string, 0),
+			Expire: -1,
+		}
+	}
+	data.Value = append(data.Value, args[2])
+	this.listData[key] = data
+	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
 }
 
 func getArgs(reader *bufio.Reader, args []string) {
