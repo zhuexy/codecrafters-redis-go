@@ -163,7 +163,9 @@ func (this *Server) RPush(conn net.Conn, args []string) {
 			Expire: -1,
 		}
 	}
-	data.Value = append(data.Value, args[2])
+	for i := 2; i < len(args); i++ {
+		data.Value = append(data.Value, args[i])
+	}
 	this.listData[key] = data
 	this.lock.Unlock()
 	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
