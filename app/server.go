@@ -197,12 +197,19 @@ func (this *Server) LRange(conn net.Conn, args []string) {
 		fmt.Println("Failed to parse stop")
 		return
 	}
+	if start > stop {
+		this.write(conn, "*0\r\n")
+		return
+	}
 	this.lock.Lock()
 	data, ok := this.listData[key]
 	this.lock.Unlock()
-	if !ok {
+	if !ok || start > len(data.Value)-1 {
 		this.write(conn, "*0\r\n")
 		return
+	}
+	if stop > len(data.Value) {
+		stop = len(data.Value) - 1
 	}
 	result := data.Value[start : stop+1]
 	this.writeList(conn, result)
