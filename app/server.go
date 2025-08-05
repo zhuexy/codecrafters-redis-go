@@ -87,6 +87,8 @@ func (this *Server) HandleConn(conn net.Conn) {
 			this.LRange(conn, args)
 		case "LPUSH":
 			this.LPush(conn, args)
+		case "LLEN":
+			this.LLen(conn, args)
 		}
 	}
 }
@@ -257,6 +259,21 @@ func (this *Server) writeList(conn net.Conn, result []string) {
 	for _, value := range result {
 		this.write(conn, "$"+strconv.Itoa(len(value))+"\r\n"+value+"\r\n")
 	}
+}
+
+func (this *Server) LLen(conn net.Conn, args []string) {
+	if len(args) < 2 {
+		fmt.Println("Failed to llen")
+		return
+	}
+	key := args[1]
+	this.lock.Lock()
+	data, ok := this.listData[key]
+	this.lock.Unlock()
+	if !ok {
+		this.write(conn, ":0\r\n")
+	}
+	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
 }
 
 func getArgs(reader *bufio.Reader, args []string) {
