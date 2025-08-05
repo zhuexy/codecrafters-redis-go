@@ -89,6 +89,8 @@ func (this *Server) HandleConn(conn net.Conn) {
 			this.LPush(conn, args)
 		case "LLEN":
 			this.LLen(conn, args)
+		case "LPOP":
+			this.LPop(conn, args)
 		}
 	}
 }
@@ -275,6 +277,27 @@ func (this *Server) LLen(conn net.Conn, args []string) {
 		return
 	}
 	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
+}
+
+func (this *Server) LPop(conn net.Conn, args []string) {
+	if len(args) < 2 {
+		fmt.Println("Failed to lpop")
+		return
+	}
+	key := args[1]
+	this.lock.Lock()
+	data, ok := this.listData[key]
+	this.lock.Unlock()
+	if !ok || len(data.Value) == 0 {
+		this.write(conn, "$-1\r\n")
+		return
+	}
+	result := data.Value[0]
+	data.Value = data.Value[1:]
+	this.lock.Lock()
+	this.listData[key] = data
+	this.lock.Unlock()
+	this.write(conn, "$"+strconv.Itoa(len(result))+"\r\n"+result+"\r\n")
 }
 
 func getArgs(reader *bufio.Reader, args []string) {
