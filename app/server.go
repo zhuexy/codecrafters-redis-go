@@ -272,6 +272,7 @@ func (this *Server) LLen(conn net.Conn, args []string) {
 	this.lock.Unlock()
 	if !ok {
 		this.write(conn, ":0\r\n")
+		return
 	}
 	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
 }
