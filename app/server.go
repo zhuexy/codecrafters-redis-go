@@ -85,6 +85,8 @@ func (this *Server) HandleConn(conn net.Conn) {
 			this.RPush(conn, args)
 		case "LRANGE":
 			this.LRange(conn, args)
+		case "LPUSH":
+			this.LPush(conn, args)
 		}
 	}
 }
@@ -225,6 +227,29 @@ func (this *Server) LRange(conn net.Conn, args []string) {
 	}
 	result := data.Value[start : stop+1]
 	this.writeList(conn, result)
+}
+
+func (this *Server) LPush(conn net.Conn, args []string) {
+	if len(args) < 3 {
+		fmt.Println("Failed to lpush")
+		return
+	}
+	key := args[1]
+	this.lock.Lock()
+	data, ok := this.listData[key]
+	if !ok {
+		data = ListData{
+			Value:  make([]string, 0),
+			Expire: -1,
+		}
+	}
+	// 将参数从后往前插入到列表开头
+	for i := len(args) - 1; i >= 2; i-- {
+		data.Value = append([]string{args[i]}, data.Value...)
+	}
+	this.listData[key] = data
+	this.lock.Unlock()
+	this.write(conn, ":"+strconv.Itoa(len(data.Value))+"\r\n")
 }
 
 func (this *Server) writeList(conn net.Conn, result []string) {
