@@ -243,8 +243,8 @@ func (this *Server) LPush(conn net.Conn, args []string) {
 			Expire: -1,
 		}
 	}
-	// 将参数从后往前插入到列表开头
-	for i := len(args) - 1; i >= 2; i-- {
+	// 将参数按顺序插入到列表开头
+	for i := 2; i < len(args); i++ {
 		data.Value = append([]string{args[i]}, data.Value...)
 	}
 	this.listData[key] = data
