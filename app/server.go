@@ -56,7 +56,7 @@ func (this *Server) HandleConn(conn net.Conn) {
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Failed to read")
+			fmt.Println("Failed to read:", err)
 			return
 		}
 		line = strings.TrimRight(line, "\r\n")
@@ -264,7 +264,7 @@ func getArgs(reader *bufio.Reader, args []string) {
 	for i := 0; i < count; i++ {
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Failed to read")
+			fmt.Println("Failed to read:", err)
 			return
 		}
 		line = strings.TrimRight(line, "\r\n")
@@ -279,7 +279,7 @@ func getArgs(reader *bufio.Reader, args []string) {
 		}
 		line, err = reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Failed to read")
+			fmt.Println("Failed to read:", err)
 			return
 		}
 		args[i] = line[:length]
