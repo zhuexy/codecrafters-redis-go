@@ -204,12 +204,28 @@ func (this *Server) LRange(conn net.Conn, args []string) {
 	this.lock.Lock()
 	data, ok := this.listData[key]
 	this.lock.Unlock()
-	if !ok || start > len(data.Value)-1 {
+	if !ok {
 		this.write(conn, "*0\r\n")
 		return
 	}
-	if stop > len(data.Value) {
-		stop = len(data.Value) - 1
+	length := len(data.Value)
+	if start < 0 {
+		start = length + start
+		if start < 0 {
+			start = 0
+		}
+	}
+	if stop > length {
+		stop = length - 1
+	} else if stop < 0 {
+		stop = length + stop
+		if stop < 0 {
+			stop = 0
+		}
+	}
+	if start > stop {
+		this.write(conn, "*0\r\n")
+		return
 	}
 	result := data.Value[start : stop+1]
 	this.writeList(conn, result)
