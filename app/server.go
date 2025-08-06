@@ -292,12 +292,20 @@ func (this *Server) LPop(conn net.Conn, args []string) {
 		this.write(conn, "$-1\r\n")
 		return
 	}
-	result := data.Value[0]
-	data.Value = data.Value[1:]
+	count := 1
+	if len(args) == 3 {
+		count, _ = strconv.Atoi(args[2])
+	}
+	result := data.Value[:count]
+	data.Value = data.Value[count:]
 	this.lock.Lock()
 	this.listData[key] = data
 	this.lock.Unlock()
-	this.write(conn, "$"+strconv.Itoa(len(result))+"\r\n"+result+"\r\n")
+	if len(result) == 1 {
+		this.write(conn, "$"+strconv.Itoa(len(result[0]))+"\r\n"+result[0]+"\r\n")
+	} else {
+		this.writeList(conn, result)
+	}
 }
 
 func getArgs(reader *bufio.Reader, args []string) {
